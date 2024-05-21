@@ -1,0 +1,81 @@
+
+# docker-compose.yml
+
+version: '3.9'
+
+networks:
+  domjudge:
+    name: domjudge
+
+volumes:
+  dados-mysql:
+
+
+services:
+  mariadb:
+    container_name: mariadb
+    image: mariadb:latest
+    networks:
+      - domjudge
+    ports:
+      - 13306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpw
+      - MYSQL_USER=domjudge
+      - MYSQL_PASSWORD=djpw
+      - MYSQL_DATABASE=domjudge
+    command: --max-connections=1000
+    volumes:
+      - dados-mysql:/var/lib/mysql
+
+  domserver:
+    container_name: domserver
+    image: domjudge/domserver:latest
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    networks:
+      - domjudge
+    ports:
+      - 12345:80
+    depends_on:
+      - mariadb
+    environment:
+      - CONTAINER_TIMEZONE=America/Sao_Paulo
+      - MYSQL_HOST=mariadb
+      - MYSQL_ROOT_PASSWORD=rootpw
+      - MYSQL_USER=domjudge
+      - MYSQL_PASSWORD=djpw
+      - MYSQL_DATABASE=domjudge
+
+  judgehost-0:
+    container_name: judgehost-0
+    image: domjudge/judgehost:latest
+    privileged: true
+    hostname: judgedaemon-0
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup
+    networks:
+      - domjudge
+    depends_on:
+      - domserver
+    environment:
+      - DAEMON_ID=0
+      - JUDGEDAEMON_PASSWORD=GjVTuV0p5RpBPt+yolo/G8XoxBUbSpfA
+  phpadm:
+    container_name: phpadm
+    image: phpmyadmin/phpmyadmin:latest
+    networks:
+      - domjudge
+    ports:
+      - 8080:80
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=mariadb
+      - PMA_USER=domjudge
+      - PMA_PASSWORD=djpw
+
+# To get judgehost password, type on terminal:
+# docker exec -it domserver cat /opt/domjudge/domserver/etc/restapi.secret
+
+# To get admin password, type on terminal:
+# docker exec -it domserver cat /opt/domjudge/domserver/etc/initial_admin_password.secret
